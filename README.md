@@ -27,9 +27,3 @@ jobs:
       contents: read
       packages: write
 ```
-
-### Access
-
-This is a private repo. For another private repo owned by the same account
-to call this workflow, this repo's **Settings → Actions → General → Access**
-must be set to "Accessible from repositories owned by 'aaronkyriesenbach' user".
