@@ -1,0 +1,63 @@
+name: NPM Build and Publish
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        type: string
+        default: "22"
+    secrets:
+      npm-token:
+        required: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    # `release` has no protection rules and behaves like no environment
+    # at all. `branch-preview` requires manual approval (configured once
+    # in repo Settings > Environments) so branch snapshots are never
+    # published unattended. If nobody approves, `timeout-minutes` cancels
+    # the job after waiting 1 day.
+    environment: >-
+      ${{ github.ref_name == 'master' && 'release' || 'branch-preview' }}
+    timeout-minutes: ${{ github.ref_name == 'master' && 30 || 1440 }}
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci
+
+      - name: Determine version and dist-tag
+        id: meta
+        run: |
+          if [[ "${{ github.ref_name }}" == "master" ]]; then
+            # release-please already bumped package.json's version on merge.
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          else
+            SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+            SAFE_BRANCH=$(echo "${{ github.ref_name }}" \
+              | tr '/' '-' | tr '[:upper:]' '[:lower:]')
+            BASE_VERSION=$(node -p "require('./package.json').version")
+            npm version "${BASE_VERSION}-${SAFE_BRANCH}.${SHORT_SHA}" \
+              --no-git-tag-version
+            echo "tag=${SAFE_BRANCH}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish
+        run: >-
+          npm publish --tag ${{ steps.meta.outputs.tag }}
+          --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.npm-token }}

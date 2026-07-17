@@ -72,3 +72,33 @@ Replace `<checks job name>` with the exact `name:` of the `checks` job in
 that repo's `docker.yaml` (e.g. `Check and test`, `Build, vet, and test`,
 `Build, test, and lint` — check `repos/<owner>/<repo>/commits/master/check-runs`
 via `gh api` if unsure of the exact string).
+
+## 3. Create the `release` and `branch-preview` environments
+
+`docker-build-push.yaml` and `npm-build-push.yaml` both select their
+GitHub Environment at runtime (`release` on `master`, `branch-preview`
+anywhere else). Neither environment is created automatically, and
+`branch-preview` needs to exist with a required reviewer *before* the first
+branch push — if it doesn't exist yet, GitHub runs the job with no
+protection at all instead of blocking it.
+
+**Via the UI:** repo → Settings → Environments → New environment → name it
+`branch-preview` → under "Deployment protection rules" check **"Required
+reviewers"** and add yourself (or whoever should approve) → Save protection
+rules. Then create a second environment named `release` and leave it with no
+protection rules (it exists purely so `master` runs have a named environment
+too — functionally identical to no environment).
+
+**Via `gh`:**
+
+```sh
+gh api -X PUT repos/<owner>/<repo>/environments/release
+gh api -X PUT repos/<owner>/<repo>/environments/branch-preview \
+  -f 'reviewers[][type]=User' -F 'reviewers[][id]=<your-user-id>'
+```
+
+(`<your-user-id>` is a numeric GitHub user ID, e.g. from `gh api user -q .id`.)
+
+Both workflows also set `timeout-minutes: 1440` on branch runs, so an
+unapproved `branch-preview` deployment cancels itself after 1 day instead of
+waiting on an approval indefinitely.

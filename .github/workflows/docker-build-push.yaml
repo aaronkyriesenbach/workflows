@@ -4,7 +4,9 @@ on:
   workflow_call:
     inputs:
       version:
-        description: Version to tag the release image with (used only for master builds)
+        description: >-
+          Version to tag the release image with (used only for
+          master builds)
         type: string
         required: false
         default: ""
@@ -16,6 +18,15 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+
+    # `release` has no protection rules and behaves like no environment
+    # at all. `branch-preview` requires manual approval (configured once
+    # in repo Settings > Environments) so branch images are never pushed
+    # unattended. If nobody approves, `timeout-minutes` cancels the job
+    # after waiting 1 day.
+    environment: >-
+      ${{ github.ref_name == 'master' && 'release' || 'branch-preview' }}
+    timeout-minutes: ${{ github.ref_name == 'master' && 360 || 1440 }}
 
     permissions:
       contents: read
@@ -35,7 +46,8 @@ jobs:
             TAGS="${IMAGE}:${{ inputs.version }},${IMAGE}:latest"
           else
             SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-            SAFE_BRANCH=$(echo "${{ github.ref_name }}" | tr '/' '-' | tr '[:upper:]' '[:lower:]')
+            SAFE_BRANCH=$(echo "${{ github.ref_name }}" \
+              | tr '/' '-' | tr '[:upper:]' '[:lower:]')
             TAGS="${IMAGE}:${SAFE_BRANCH}-${SHORT_SHA}"
           fi
 

@@ -28,7 +28,9 @@ the repo root (override via the `config-file`/`manifest-file` inputs).
 Builds a Docker image and pushes to GHCR. On `master`, tags `<version>` (from
 the `version` input) and `latest`. On any other branch, tags
 `<branch>-<sha>` — branch builds are for testing only and carry no version
-number.
+number. Branch pushes require manual approval via the `branch-preview`
+environment (see [npm-build-push.yaml](#npm-build-pushyaml) below and
+[SETUP.md](./SETUP.md)).
 
 ### Usage
 
@@ -46,6 +48,41 @@ docker:
 
 `if: always()` is required so the `docker` job isn't auto-skipped on branch
 pushes, where `release-please` is itself skipped by its own `if`.
+
+## npm-build-push.yaml
+
+Publishes an npm package. On `master`, publishes the version already bumped
+into `package.json` by release-please, tagged `latest`. On any other branch,
+publishes a prerelease snapshot version (`<version>-<branch>.<sha>`) tagged
+with the sanitized branch name as its dist-tag, so it never overwrites
+`latest` and can be installed directly:
+`npm install <package>@<branch-name>`.
+
+Both `docker-build-push.yaml` and `npm-build-push.yaml` gate their branch
+publishes behind a `branch-preview` GitHub Environment that requires manual
+approval, with a 1-day `timeout-minutes` so an unapproved run cancels itself
+instead of waiting forever. `master` releases run under a separate `release`
+environment with no protection rules, so real releases are never blocked on
+approval. See [SETUP.md](./SETUP.md) for the one-time environment setup.
+
+### Usage
+
+```yaml
+npm-publish:
+  needs: [checks, release-please]
+  if: >
+    always() && needs.checks.result == 'success' &&
+    (github.ref_name != 'master' || needs.release-please.outputs.release_created == 'true')
+  uses: aaronkyriesenbach/workflows/.github/workflows/npm-build-push.yaml@master
+  secrets:
+    npm-token: ${{ secrets.NPM_TOKEN }}
+  permissions:
+    contents: read
+    id-token: write
+```
+
+Requires an `NPM_TOKEN` secret (npm automation token) and, for scoped
+packages, `"publishConfig": { "access": "public" }` in `package.json`.
 
 ## Adding checks (optional, per-repo)
 
