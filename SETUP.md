@@ -29,49 +29,69 @@ gh api -X PUT repos/<owner>/<repo>/actions/permissions/workflow \
   -F can_approve_pull_request_reviews=true
 ```
 
-## 2. Require the `checks` status check before merging (optional)
+## 2. Don't require the `checks` status check for merging
 
-Only relevant for repos that define a `checks` job (see the README). This
-stops the Release PR's merge button from going green while `checks` is
-failing.
+It's tempting to add a branch protection rule requiring the `checks` job to
+pass before merging into `master`, so the Release PR's merge button warns
+you if `checks` is red. **This doesn't work, and isn't a config mistake — it's
+structural.**
 
-**Requires GitHub Pro on private repos** — GitHub gates both classic branch
-protection and the newer Rulesets API behind Pro for private repos on free
-accounts (public repos work on the free plan). The API call below returns
-`403 Upgrade to GitHub Pro or make this repository public` on a private repo
-without Pro.
+`release-please-action` authenticates with `secrets.GITHUB_TOKEN`, so both
+the branch it pushes and the PR it opens are attributed to `GITHUB_TOKEN`.
+GitHub's own loop-prevention rule means events authored by `GITHUB_TOKEN`
+never trigger a new `push`-triggered workflow run ([docs](https://docs.github.com/en/actions/concepts/security/github_token)),
+so `checks` (and everything else in `docker.yaml`/`ci.yaml`) simply never
+runs on the Release PR's branch — not slowly, not flakily, *never*. If you
+require that check for merging, every single Release PR permanently shows
+`mergeStateStatus: BLOCKED` and needs an admin bypass (`gh pr merge --admin`
+or the web UI's "merge without waiting for requirements" button) to merge at
+all, forever. `release-please-action`'s own README confirms this and
+recommends a personal access token as the fix — see the note below on why we
+deliberately don't do that.
 
-Note this is a nice-to-have, not a hard requirement: `docker` already
-depends on `needs.checks.result == 'success'` directly, so no broken build
-can be published even if the Release PR itself gets merged while red — the
-next push (the merge itself) re-runs checks and still blocks `docker` if
-they fail. Skipping this step just means the merge button won't warn you
-first.
+The good news: you don't need the check on the PR to be safe from a broken
+release actually publishing. `docker`/`npm-publish` already independently
+require `needs.checks.result == 'success'` against the **merge commit**
+itself (which *does* trigger `checks` normally, since the merge is performed
+by a real account, not `GITHUB_TOKEN`) before they'll build/publish anything.
+A bad build still can't ship even with zero branch protection on `master` at
+all — the required check on the PR would only have been a visual nicety, and
+it can never actually appear for this specific kind of PR.
 
-**Via the UI:** repo → Settings → Branches → Add branch protection rule for
-`master` → check "Require status checks to pass before merging" → select
-the `checks` job's check name (must have run at least once already, or it
-won't appear in the list) → Save. Leave "Require a pull request before
-merging" unchecked — that would block the direct-to-master pushes these
-repos otherwise still support.
-
-**Via `gh`** (public repo, or private with Pro):
+If you want *some* protection on `master` (recommended) without the
+unsatisfiable check requirement, keep it to the basics:
 
 ```sh
 gh api -X PUT "repos/<owner>/<repo>/branches/master/protection" --input - <<'EOF'
 {
-  "required_status_checks": { "strict": false, "checks": [{ "context": "<checks job name>" }] },
+  "required_status_checks": null,
   "enforce_admins": false,
   "required_pull_request_reviews": null,
-  "restrictions": null
+  "restrictions": null,
+  "allow_force_pushes": false,
+  "allow_deletions": false
 }
 EOF
 ```
 
-Replace `<checks job name>` with the exact `name:` of the `checks` job in
-that repo's `docker.yaml` (e.g. `Check and test`, `Build, vet, and test`,
-`Build, test, and lint` — check `repos/<owner>/<repo>/commits/master/check-runs`
-via `gh api` if unsure of the exact string).
+This still blocks force-pushes and branch deletion, doesn't require a PAT,
+and every Release PR merges normally with a plain `gh pr merge --merge` or
+the standard green merge button — no admin bypass, no exceptions list to
+maintain.
+
+### Why not just use a PAT / GitHub App token instead?
+
+You can — giving `release-please-action` a real user or GitHub App token
+instead of `GITHUB_TOKEN` does make `checks` run normally on its PRs, and is
+what the upstream project recommends. We've chosen not to, because it adds a
+credential to create and keep alive (a PAT) or a one-time GitHub App to set
+up (lower-maintenance, but still extra infrastructure) for a check that, per
+the above, is already redundant with `docker`/`npm-publish`'s own gate. If
+you'd rather have a real green check on the Release PR before merging — e.g.
+because other people also open PRs against this repo and you want a uniform
+signal — wiring up a GitHub App token for `release-please.yaml`'s `token`
+input is the lower-maintenance of the two options (short-lived tokens,
+auto-refreshed, no manual rotation).
 
 ## 3. Create the `release` and `branch-preview` environments
 

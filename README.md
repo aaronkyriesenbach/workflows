@@ -120,10 +120,15 @@ If a repo doesn't want checks, just omit the `checks` job and drop it from
 `needs`/`if` — `docker`'s condition reverts to the release-please-only form
 shown above.
 
-Because everything triggers on `push: branches: "**"`, `checks` also runs
-automatically against release-please's own PR branch
-(`release-please--branches--master`), giving you a real pass/fail signal on
-the Release PR before merging — no extra `pull_request` trigger needed.
+Because everything triggers on `push: branches: "**"`, `checks` runs
+automatically on every real branch push, including PRs opened by other
+contributors. The one exception is release-please's own PR branch
+(`release-please--branches--master`) — it's authored by `GITHUB_TOKEN`, and
+GitHub's loop-prevention rule blocks `GITHUB_TOKEN`-authored pushes from
+triggering new workflow runs, so `checks` never runs there. This is expected
+and safe, not a bug to fix — see [SETUP.md](./SETUP.md#2-dont-require-the-checks-status-check-for-merging)
+for why, and why `master` deliberately has no required-status-check branch
+rule as a result.
 
 See [SETUP.md](./SETUP.md) for one-time manual repo configuration these
 workflows depend on.
