@@ -50,7 +50,7 @@ recommends a personal access token as the fix — see the note below on why we
 deliberately don't do that.
 
 The good news: you don't need the check on the PR to be safe from a broken
-release actually publishing. `docker`/`npm-publish` already independently
+release actually publishing. `docker`/`bun-publish` already independently
 require `needs.checks.result == 'success'` against the **merge commit**
 itself (which *does* trigger `checks` normally, since the merge is performed
 by a real account, not `GITHUB_TOKEN`) before they'll build/publish anything.
@@ -86,7 +86,7 @@ instead of `GITHUB_TOKEN` does make `checks` run normally on its PRs, and is
 what the upstream project recommends. We've chosen not to, because it adds a
 credential to create and keep alive (a PAT) or a one-time GitHub App to set
 up (lower-maintenance, but still extra infrastructure) for a check that, per
-the above, is already redundant with `docker`/`npm-publish`'s own gate. If
+the above, is already redundant with `docker`/`bun-publish`'s own gate. If
 you'd rather have a real green check on the Release PR before merging — e.g.
 because other people also open PRs against this repo and you want a uniform
 signal — wiring up a GitHub App token for `release-please.yaml`'s `token`
@@ -95,7 +95,7 @@ auto-refreshed, no manual rotation).
 
 ## 3. Create the `release` and `branch-preview` environments
 
-`docker-build-push.yaml` and `npm-build-push.yaml` both select their
+`docker-build-push.yaml` and `bun-build-push.yaml` both select their
 GitHub Environment at runtime (`release` on `master`, `branch-preview`
 anywhere else). Neither environment is created automatically, and
 `branch-preview` needs to exist with a required reviewer *before* the first

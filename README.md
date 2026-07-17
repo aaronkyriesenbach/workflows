@@ -29,7 +29,7 @@ Builds a Docker image and pushes to GHCR. On `master`, tags `<version>` (from
 the `version` input) and `latest`. On any other branch, tags
 `<branch>-<sha>` — branch builds are for testing only and carry no version
 number. Branch pushes require manual approval via the `branch-preview`
-environment (see [npm-build-push.yaml](#npm-build-pushyaml) below and
+environment (see [bun-build-push.yaml](#bun-build-pushyaml) below and
 [SETUP.md](./SETUP.md)).
 
 ### Usage
@@ -49,16 +49,24 @@ docker:
 `if: always()` is required so the `docker` job isn't auto-skipped on branch
 pushes, where `release-please` is itself skipped by its own `if`.
 
-## npm-build-push.yaml
+## bun-build-push.yaml
 
-Publishes an npm package. On `master`, publishes the version already bumped
-into `package.json` by release-please, tagged `latest`. On any other branch,
-publishes a prerelease snapshot version (`<version>-<branch>.<sha>`) tagged
-with the sanitized branch name as its dist-tag, so it never overwrites
-`latest` and can be installed directly:
-`npm install <package>@<branch-name>`.
+Publishes an npm-registry package using Bun. On `master`, publishes the
+version already bumped into `package.json` by release-please, tagged
+`latest`. On any other branch, publishes a prerelease snapshot version
+(`<version>-<branch>.<sha>`) tagged with the sanitized branch name as its
+dist-tag, so it never overwrites `latest` and can be installed directly:
+`bun add <package>@<branch-name>`.
 
-Both `docker-build-push.yaml` and `npm-build-push.yaml` gate their branch
+Uses [`oven-sh/setup-bun`](https://github.com/oven-sh/setup-bun) and
+`bun install --frozen-lockfile`/`bun publish` — repos consuming this workflow
+need a committed `bun.lock`, not a `package-lock.json`. Publishing goes
+through `bun publish`, which does not yet support `--provenance`
+([oven-sh/bun#15601](https://github.com/oven-sh/bun/issues/15601)); published
+packages won't carry a supply-chain provenance attestation until Bun adds
+that support.
+
+Both `docker-build-push.yaml` and `bun-build-push.yaml` gate their branch
 publishes behind a `branch-preview` GitHub Environment that requires manual
 approval, with a 1-day `timeout-minutes` so an unapproved run cancels itself
 instead of waiting forever. `master` releases run under a separate `release`
@@ -68,12 +76,12 @@ approval. See [SETUP.md](./SETUP.md) for the one-time environment setup.
 ### Usage
 
 ```yaml
-npm-publish:
+bun-publish:
   needs: [checks, release-please]
   if: >
     always() && needs.checks.result == 'success' &&
     (github.ref_name != 'master' || needs.release-please.outputs.release_created == 'true')
-  uses: aaronkyriesenbach/workflows/.github/workflows/npm-build-push.yaml@master
+  uses: aaronkyriesenbach/workflows/.github/workflows/bun-build-push.yaml@master
   secrets:
     npm-token: ${{ secrets.NPM_TOKEN }}
   permissions:

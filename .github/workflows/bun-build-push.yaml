@@ -1,11 +1,11 @@
-name: NPM Build and Publish
+name: Bun Build and Publish
 
 on:
   workflow_call:
     inputs:
-      node-version:
+      bun-version:
         type: string
-        default: "24"
+        default: "latest"
     secrets:
       npm-token:
         required: true
@@ -27,17 +27,21 @@ jobs:
       contents: read
       id-token: write
 
+    env:
+      NPM_TOKEN: ${{ secrets.npm-token }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Set up Node
-        uses: actions/setup-node@v7
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: ${{ inputs.node-version }}
-          registry-url: https://registry.npmjs.org
+          bun-version: ${{ inputs.bun-version }}
+          registries: |
+            https://registry.npmjs.org/|$NPM_TOKEN
 
-      - run: npm ci
+      - run: bun install --frozen-lockfile
 
       - name: Determine version and dist-tag
         id: meta
@@ -50,14 +54,10 @@ jobs:
             SAFE_BRANCH=$(echo "${{ github.ref_name }}" \
               | tr '/' '-' | tr '[:upper:]' '[:lower:]')
             BASE_VERSION=$(node -p "require('./package.json').version")
-            npm version "${BASE_VERSION}-${SAFE_BRANCH}.${SHORT_SHA}" \
+            bun pm version "${BASE_VERSION}-${SAFE_BRANCH}.${SHORT_SHA}" \
               --no-git-tag-version
             echo "tag=${SAFE_BRANCH}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Publish
-        run: >-
-          npm publish --tag ${{ steps.meta.outputs.tag }}
-          --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.npm-token }}
+        run: bun publish --tag ${{ steps.meta.outputs.tag }} --access public
