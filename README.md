@@ -32,6 +32,12 @@ number. Branch pushes require manual approval via the `branch-preview`
 environment (see [bun-build-push.yaml](#bun-build-pushyaml) below and
 [SETUP.md](./SETUP.md)).
 
+The `version` input is also passed through to `docker/build-push-action` as a
+`VERSION` build-arg, so a Dockerfile can declare `ARG VERSION` to bake the
+version into the image at build time. The input defaults to an empty string,
+so repos that don't pass it (or don't declare `ARG VERSION`) build exactly as
+before.
+
 ### Usage
 
 ```yaml

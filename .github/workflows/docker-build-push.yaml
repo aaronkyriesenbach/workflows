@@ -5,8 +5,9 @@ on:
     inputs:
       version:
         description: >-
-          Version to tag the release image with (used only for
-          master builds)
+          Version to tag the release image with (used only for master
+          builds) and to pass through to the image build as the VERSION
+          build-arg
         type: string
         required: false
         default: ""
@@ -69,5 +70,7 @@ jobs:
           context: .
           push: true
           tags: ${{ steps.tags.outputs.tags }}
+          build-args: |
+            VERSION=${{ inputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
