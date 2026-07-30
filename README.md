@@ -98,6 +98,50 @@ bun-publish:
 Requires an `NPM_TOKEN` secret (npm automation token) and, for scoped
 packages, `"publishConfig": { "access": "public" }` in `package.json`.
 
+## eas-build.yaml
+
+Triggers an [EAS Build](https://docs.expo.dev/build/introduction/) (and,
+by default, an EAS Submit) for Expo/React Native apps. The actual iOS and
+Android builds run on Expo's own cloud infrastructure, not on the GitHub
+runner — this job only installs deps and calls `eas build`, so no
+`macos-latest` runner (and its ~10x per-minute cost) is ever needed, for
+either platform. Credentials are EAS-managed; nothing signing-related is
+stored as a repo secret beyond `EXPO_TOKEN`.
+
+`--auto-submit` hands a successful build straight to EAS Submit using the
+submit profile with the same name as `profile` (defaults to `production`).
+EAS Submit always lands iOS in TestFlight and Android on whichever track
+`eas.json`'s submit profile specifies — releasing to real users is a manual
+step in App Store Connect / Play Console on both platforms and can't be
+automated further, so there's no separate gated "promote" job here.
+
+### Usage
+
+```yaml
+eas-build:
+  needs: [checks, release-please]
+  if: >
+    always() && needs.checks.result == 'success' &&
+    (needs.release-please.outputs.release_created == 'true' ||
+      github.event_name == 'workflow_dispatch')
+  uses: aaronkyriesenbach/workflows/.github/workflows/eas-build.yaml@master
+  with:
+    platform: ios
+  secrets:
+    expo-token: ${{ secrets.EXPO_TOKEN }}
+```
+
+Inputs: `platform` (default `ios`), `profile` (default `production`),
+`node-version` (default `22`), `install-command`
+(default `yarn install --frozen-lockfile` — override for npm/bun/pnpm repos),
+`working-directory` (default `.`, for monorepos), `auto-submit`
+(default `true`, set `false` to build without submitting).
+
+Requires the consuming repo to have run `eas init` once (links the project
+and writes `extra.eas.projectId` into app config) and to have an `eas.json`
+with at least a `production` build profile and a matching `production`
+submit profile.
+
 ## Adding checks (optional, per-repo)
 
 There's no shared "checks" reusable workflow — test/lint/build steps are too

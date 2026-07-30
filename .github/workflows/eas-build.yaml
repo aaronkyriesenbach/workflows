@@ -1,0 +1,54 @@
+name: EAS Build
+
+on:
+  workflow_call:
+    inputs:
+      platform:
+        type: string
+        default: ios
+      profile:
+        type: string
+        default: production
+      node-version:
+        type: string
+        default: "22"
+      install-command:
+        type: string
+        default: yarn install --frozen-lockfile
+      working-directory:
+        type: string
+        default: "."
+      auto-submit:
+        type: boolean
+        default: true
+    secrets:
+      expo-token:
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - run: ${{ inputs.install-command }}
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.expo-token }}
+
+      - name: eas build
+        run: >
+          eas build --platform ${{ inputs.platform }}
+          --profile ${{ inputs.profile }} --non-interactive
+          ${{ inputs.auto-submit && '--auto-submit' || '' }}
