@@ -13,12 +13,28 @@ Release. Outputs `release_created` and `version` for downstream jobs.
 
 ```yaml
 release-please:
-  if: github.ref_name == 'master'
+  needs: checks
+  if: github.ref_name == 'master' && needs.checks.result == 'success'
   uses: aaronkyriesenbach/workflows/.github/workflows/release-please.yaml@master
   permissions:
     contents: write
     pull-requests: write
 ```
+
+Gating on `needs.checks.result == 'success'` matters specifically for the
+release-please PR's *merge commit*: that commit is authored by you (not
+`GITHUB_TOKEN`), so `checks` genuinely runs on it. Without this gate,
+release-please tags/publishes the release regardless of whether `checks`
+passed on that commit — an explicit `if:` on a job replaces the implicit
+`success()` that `needs:` would otherwise imply, so this has to be spelled
+out, it doesn't come for free from `needs: checks` alone. This is
+unrelated to (and doesn't conflict with) never requiring `checks` as a
+branch-protection status check on the release-please PR itself — see
+[SETUP.md](./SETUP.md#2-dont-require-the-checks-status-check-for-merging)
+for why that part stays impossible structurally.
+
+If a repo has no `checks` job, drop the gating back to
+`if: github.ref_name == 'master'` with no `needs:`.
 
 Expects `release-please-config.json` and `.release-please-manifest.json` at
 the repo root (override via the `config-file`/`manifest-file` inputs).
