@@ -1,0 +1,31 @@
+name: YAML Lint
+
+on:
+  workflow_call:
+    inputs:
+      path:
+        description: Path to lint (file or directory), relative to the repo root
+        type: string
+        default: .github
+
+jobs:
+  yamllint:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Lint
+        run: yamllint ${{ inputs.path }}

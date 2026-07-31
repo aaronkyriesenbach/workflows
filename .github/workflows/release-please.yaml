@@ -14,6 +14,8 @@ on:
         value: ${{ jobs.release-please.outputs.release_created }}
       version:
         value: ${{ jobs.release-please.outputs.version }}
+      paths-released:
+        value: ${{ jobs.release-please.outputs.paths-released }}
 
 jobs:
   release-please:
@@ -26,6 +28,7 @@ jobs:
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       version: ${{ steps.release.outputs.version }}
+      paths-released: ${{ steps.release.outputs.paths_released }}
 
     steps:
       - uses: googleapis/release-please-action@v5

@@ -1,0 +1,11 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+
+jobs:
+  yamllint:
+    uses: ./.github/workflows/yamllint.yaml
+    with:
+      path: .github

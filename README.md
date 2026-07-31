@@ -7,7 +7,11 @@ Shared, reusable GitHub Actions workflows for my private repos.
 Wraps [`googleapis/release-please-action`](https://github.com/googleapis/release-please-action).
 Maintains a standing Release PR from Conventional Commits on `master`; merging
 it bumps the version, updates the changelog, and creates a git tag + GitHub
-Release. Outputs `release_created` and `version` for downstream jobs.
+Release. Outputs `release_created` and `version` for downstream jobs, plus
+`paths-released` — a passthrough of the underlying action's own
+`paths_released` output (a JSON array of the manifest paths released in this
+run), useful for monorepo callers that gate per-package jobs on whether
+their specific path was released.
 
 ### Usage
 
@@ -114,6 +118,19 @@ bun-publish:
 Requires an `NPM_TOKEN` secret (npm automation token) and, for scoped
 packages, `"publishConfig": { "access": "public" }` in `package.json`.
 
+Accepts a `working-directory` input (default `.`) so a monorepo caller can
+point at an individual package; all install/build/publish steps run there.
+Single-package callers can omit it entirely.
+
+```yaml
+bun-publish:
+  uses: aaronkyriesenbach/workflows/.github/workflows/bun-build-push.yaml@master
+  with:
+    working-directory: packages/my-package
+  secrets:
+    npm-token: ${{ secrets.NPM_TOKEN }}
+```
+
 ## eas-build.yaml
 
 Triggers an [EAS Build](https://docs.expo.dev/build/introduction/) (and,
@@ -203,6 +220,25 @@ triggering new workflow runs, so `checks` never runs there. This is expected
 and safe, not a bug to fix — see [SETUP.md](./SETUP.md#2-dont-require-the-checks-status-check-for-merging)
 for why, and why `master` deliberately has no required-status-check branch
 rule as a result.
+
+## yamllint.yaml
+
+Lints YAML files with [yamllint](https://yamllint.readthedocs.io/) against
+this repo's own [`.yamllint`](./.yamllint) config. Accepts a `path` input
+(file or directory, default `.github`).
+
+### Usage
+
+```yaml
+yamllint:
+  uses: aaronkyriesenbach/workflows/.github/workflows/yamllint.yaml@master
+  with:
+    path: .github
+```
+
+This repo uses it against its own `.github` directory as a self-check CI
+(see [`ci.yaml`](./.github/workflows/ci.yaml)) — the shared workflows'
+own YAML has to lint clean before it's trusted for other repos to call.
 
 See [SETUP.md](./SETUP.md) for one-time manual repo configuration these
 workflows depend on.

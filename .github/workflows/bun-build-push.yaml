@@ -6,6 +6,13 @@ on:
       bun-version:
         type: string
         default: "latest"
+      working-directory:
+        description: >-
+          Directory to run install/build/publish steps in, relative to the
+          repo root. Defaults to the repo root itself, so single-package
+          callers are unaffected.
+        type: string
+        default: "."
     secrets:
       npm-token:
         required: true
@@ -29,6 +36,10 @@ jobs:
 
     env:
       NPM_TOKEN: ${{ secrets.npm-token }}
+
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
 
     steps:
       - name: Checkout
