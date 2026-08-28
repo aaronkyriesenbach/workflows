@@ -221,6 +221,40 @@ and safe, not a bug to fix — see [SETUP.md](./SETUP.md#2-dont-require-the-chec
 for why, and why `master` deliberately has no required-status-check branch
 rule as a result.
 
+## zola-pages.yaml
+
+Builds a [Zola](https://www.getzola.org/) site and deploys it straight to
+GitHub Pages using GitHub's Actions-based Pages publishing (no `gh-pages`
+branch, no artifact committed to git). Runs as two jobs, `build` then
+`deploy`, matching GitHub's own recommended split so the `deploy` job can
+carry the `github-pages` deployment environment on its own.
+
+Downloads the pinned Zola release binary directly from GitHub Releases
+(`x86_64-unknown-linux-gnu`) rather than depending on a Docker image, since
+Actions runners already provide everything else `zola build` needs.
+
+### Usage
+
+```yaml
+deploy:
+  uses: aaronkyriesenbach/workflows/.github/workflows/zola-pages.yaml@master
+  with:
+    zola-version: "0.23.4"
+  permissions:
+    contents: read
+    pages: write
+    id-token: write
+```
+
+Inputs: `zola-version` (required, no leading `v`, keep in sync with the
+version pinned for local dev/Docker), `working-directory` (default `.`, for
+monorepo callers with the Zola project in a subdirectory).
+
+The consuming repo must have GitHub Pages' build source set to **GitHub
+Actions** (Settings → Pages → Build and deployment → Source), and, for a
+custom domain, the domain configured in that same settings page — see
+[SETUP.md](./SETUP.md#4-enable-github-pages-and-configure-a-custom-domain-for-zola-pagesyaml).
+
 ## yamllint.yaml
 
 Lints YAML files with [yamllint](https://yamllint.readthedocs.io/) against

@@ -122,3 +122,39 @@ gh api -X PUT repos/<owner>/<repo>/environments/branch-preview \
 Both workflows also set `timeout-minutes: 1440` on branch runs, so an
 unapproved `branch-preview` deployment cancels itself after 1 day instead of
 waiting on an approval indefinitely.
+
+## 4. Enable GitHub Pages and configure a custom domain (for `zola-pages.yaml`)
+
+`zola-pages.yaml` deploys through `actions/deploy-pages`, which requires the
+repo's Pages source to be **GitHub Actions**, not a branch. This is a repo
+setting, not something the workflow can turn on for itself the first time.
+
+**Via the UI:** repo → Settings → Pages → "Build and deployment" → Source →
+**GitHub Actions**.
+
+**Via `gh`:**
+
+```sh
+gh api -X POST repos/<owner>/<repo>/pages -f build_type=workflow
+```
+
+(Use `PATCH` instead of `POST` if the Pages site already exists from a
+previous branch-based setup.)
+
+For a custom domain, set it the same way. With Actions-based builds, any
+`CNAME` file in the deployed artifact is ignored — the domain lives purely in
+this repo setting, not in site content.
+
+**Via the UI:** same Settings → Pages screen → "Custom domain" → enter the
+domain → Save. Once GitHub verifies the DNS records (see the consuming
+repo's own docs for what to add at the registrar), come back and check
+**Enforce HTTPS** — it stays greyed out until DNS resolves correctly, and the
+certificate can take up to 24 hours to provision after that.
+
+**Via `gh`:**
+
+```sh
+gh api -X PUT repos/<owner>/<repo>/pages -f cname=example.com
+# after DNS verifies and a cert is issued:
+gh api -X PUT repos/<owner>/<repo>/pages -F https_enforced=true
+```
