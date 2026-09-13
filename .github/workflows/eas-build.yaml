@@ -21,6 +21,9 @@ on:
       auto-submit:
         type: boolean
         default: true
+      bump-patch-for-test-build:
+        type: boolean
+        default: false
     secrets:
       expo-token:
         required: true
@@ -41,6 +44,16 @@ jobs:
           node-version: ${{ inputs.node-version }}
 
       - run: ${{ inputs.install-command }}
+
+      - name: Bump patch version for ad hoc test build (workspace-only, never committed)
+        if: inputs.bump-patch-for-test-build
+        run: |
+          version=$(jq -r '.expo.version' app.json)
+          IFS='.' read -r major minor patch <<< "$version"
+          new_version="${major}.${minor}.$((patch + 1))"
+          jq --arg v "$new_version" '.expo.version = $v' app.json > app.json.tmp
+          mv app.json.tmp app.json
+          echo "Ephemeral test version: $new_version"
 
       - uses: expo/expo-github-action@v9
         with:
