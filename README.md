@@ -85,12 +85,13 @@ dist-tag, so it never overwrites `latest` and can be installed directly:
 `bun add <package>@<branch-name>`.
 
 Uses [`oven-sh/setup-bun`](https://github.com/oven-sh/setup-bun) and
-`bun install --frozen-lockfile`/`bun publish` — repos consuming this workflow
-need a committed `bun.lock`, not a `package-lock.json`. Publishing goes
-through `bun publish`, which does not yet support `--provenance`
-([oven-sh/bun#15601](https://github.com/oven-sh/bun/issues/15601)); published
-packages won't carry a supply-chain provenance attestation until Bun adds
-that support.
+`bun install --frozen-lockfile` — repos consuming this workflow need a
+committed `bun.lock`, not a `package-lock.json`. Publishing goes through
+`npm publish` using [npm trusted publishing](https://docs.npmjs.com/trusted-publishers)
+(OIDC), because `bun publish` has no OIDC support
+([oven-sh/bun#22423](https://github.com/oven-sh/bun/issues/22423)). No npm
+token or secret is involved, and provenance attestations are generated
+automatically for public packages published from public repos.
 
 Both `docker-build-push.yaml` and `bun-build-push.yaml` gate their branch
 publishes behind a `branch-preview` GitHub Environment that requires manual
@@ -108,15 +109,26 @@ bun-publish:
     always() && needs.checks.result == 'success' &&
     (github.ref_name != 'master' || needs.release-please.outputs.release_created == 'true')
   uses: aaronkyriesenbach/workflows/.github/workflows/bun-build-push.yaml@master
-  secrets:
-    npm-token: ${{ secrets.NPM_TOKEN }}
   permissions:
     contents: read
     id-token: write
 ```
 
-Requires an `NPM_TOKEN` secret (npm automation token) and, for scoped
-packages, `"publishConfig": { "access": "public" }` in `package.json`.
+Requires a trusted publisher configured for each package on npmjs.com
+(Settings → Trusted Publisher → GitHub Actions) with:
+
+- **Workflow filename:** the *calling* workflow's file (e.g. `ci.yaml`), not
+  `bun-build-push.yaml` — npm validates the caller when a reusable workflow is
+  involved.
+- **Environment:** `release` for `master` publishes; add a second config for
+  `branch-preview` to allow branch snapshots.
+- **Allowed actions:** `npm publish` (new configs default to stage-only, which
+  needs manual 2FA approval).
+
+The caller job must also grant `id-token: write`, and each package's
+`repository.url` must match the GitHub repo exactly. A new config must
+complete a first successful publish within 2 days or it expires. For scoped
+packages, set `"publishConfig": { "access": "public" }` in `package.json`.
 
 Accepts a `working-directory` input (default `.`) so a monorepo caller can
 point at an individual package; all install/build/publish steps run there.
@@ -127,8 +139,9 @@ bun-publish:
   uses: aaronkyriesenbach/workflows/.github/workflows/bun-build-push.yaml@master
   with:
     working-directory: packages/my-package
-  secrets:
-    npm-token: ${{ secrets.NPM_TOKEN }}
+  permissions:
+    contents: read
+    id-token: write
 ```
 
 ## eas-build.yaml
